@@ -251,3 +251,17 @@ dotnet_diagnostic.CA2007.severity = none
 
 # IDE0058: Expression value is never used
 dotnet_diagnostic.IDE0058.severity = none
+
+#### StyleCop Analyzer Configuration ####
+
+# SA1101: Prefix local calls with this
+# Reason: Modern C# doesn't require 'this.' everywhere
+dotnet_diagnostic.SA1101.severity = none
+
+# SA1309: Field names should not begin with underscore
+# Reason: Standard .NET naming convention for private fields
+dotnet_diagnostic.SA1309.severity = none
+
+# SA1633: File should have header
+# Reason: Copyright header format incompatible with XML requirement
+dotnet_diagnostic.SA1633.severity = none
