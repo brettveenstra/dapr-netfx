@@ -113,27 +113,42 @@ namespace DaprNetFx.Http
 
         private async Task<HttpResponseMessage> SendRequestAsync(HttpRequestMessage request)
         {
+            HttpResponseMessage response = null;
             try
             {
                 // Use cancellation token for per-request timeout (singleton HttpClient pattern)
                 using (var cts = new System.Threading.CancellationTokenSource(_options.HttpTimeout))
                 {
-                    var response = await SharedHttpClient.SendAsync(request, cts.Token)
+                    response = await SharedHttpClient.SendAsync(request, cts.Token)
                         .ConfigureAwait(false);
                     response.EnsureSuccessStatusCode();
-                    return response;
+                    return response; // Caller must dispose
                 }
             }
-            catch (Exception ex) when (
-                (ex is HttpRequestException || ex is System.Threading.Tasks.TaskCanceledException)
-                && _options.Required)
+            catch (HttpRequestException ex) when (_options.Required)
             {
+                response?.Dispose();
                 throw new DaprException(
                     $"Failed to communicate with Dapr at {_options.HttpEndpoint}. " +
                     $"Ensure Dapr sidecar is running. " +
                     $"For local development, run: dapr run --app-id <your-app-id> " +
                     $"To disable this check, set Dapr:Required=false in app.config.",
                     ex);
+            }
+            catch (System.Threading.Tasks.TaskCanceledException ex) when (_options.Required)
+            {
+                response?.Dispose();
+                throw new DaprException(
+                    $"Request to Dapr at {_options.HttpEndpoint} timed out after {_options.HttpTimeout.TotalSeconds}s. " +
+                    $"Ensure Dapr sidecar is running and responsive. " +
+                    $"To disable this check, set Dapr:Required=false in app.config.",
+                    ex);
+            }
+            catch
+            {
+                // Dispose response on any other exception (e.g., EnsureSuccessStatusCode with Required=false)
+                response?.Dispose();
+                throw;
             }
         }
 

@@ -164,6 +164,59 @@ namespace DaprNetFx.Tests
         }
 
         [Test]
+        public void InvokeMethodAsync_WhenDaprUnavailableAndRequiredFalse_ShouldThrowHttpRequestException()
+        {
+            // Arrange - create client pointing to non-existent Dapr with Required=false
+            var optionalOptions = new DaprClientOptions
+            {
+                HttpEndpoint = "http://localhost:9998",
+                Required = false, // Key: Exception should NOT be wrapped in DaprException
+                HttpTimeout = TimeSpan.FromSeconds(1)
+            };
+
+            using (var optionalClient = new DaprClient(optionalOptions))
+            {
+                // Act & Assert - Should throw HttpRequestException (unwrapped), not DaprException
+                var exception = Should.Throw<System.Net.Http.HttpRequestException>(async () =>
+                    await optionalClient.InvokeMethodAsync<object, object>("app", "method", new { }));
+
+                // Exception should be the raw HttpRequestException, not wrapped
+                exception.ShouldNotBeNull();
+                exception.GetType().ShouldBe(typeof(System.Net.Http.HttpRequestException));
+            }
+        }
+
+        [Test]
+        public void InvokeMethodAsync_WhenDaprReturns500AndRequiredFalse_ShouldThrowHttpRequestException()
+        {
+            // Arrange - Dapr returns 500 error with Required=false
+            _wireMockServer
+                .Given(Request.Create()
+                    .WithPath("/v1.0/invoke/failing-app/method/fail")
+                    .UsingPost())
+                .RespondWith(Response.Create()
+                    .WithStatusCode(500)
+                    .WithBody("{\"error\":\"Internal server error\"}"));
+
+            var optionalOptions = new DaprClientOptions
+            {
+                HttpEndpoint = _wireMockServer.Urls[0],
+                Required = false
+            };
+
+            using (var optionalClient = new DaprClient(optionalOptions))
+            {
+                // Act & Assert - EnsureSuccessStatusCode throws HttpRequestException
+                var exception = Should.Throw<System.Net.Http.HttpRequestException>(async () =>
+                    await optionalClient.InvokeMethodAsync<object, object>("failing-app", "fail", new { }));
+
+                // Verify it's the raw exception (not wrapped in DaprException)
+                exception.ShouldNotBeNull();
+                exception.Message.ShouldContain("500");
+            }
+        }
+
+        [Test]
         public async Task InvokeMethodAsync_WithApiToken_ShouldIncludeTokenHeader()
         {
             // Arrange
