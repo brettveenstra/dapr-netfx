@@ -1,0 +1,251 @@
+// Copyright (c) 2025 DaprNetFx Contributors. Licensed under the MIT License.
+
+namespace DaprNetFx.Tests
+{
+    using System;
+    using System.Threading.Tasks;
+    using NUnit.Framework;
+    using Shouldly;
+    using WireMock.RequestBuilders;
+    using WireMock.ResponseBuilders;
+    using WireMock.Server;
+
+    /// <summary>
+    /// Tests for <see cref="DaprClient"/> using WireMock to mock Dapr HTTP API.
+    /// </summary>
+    [TestFixture]
+    public class DaprClientTests
+    {
+        private WireMockServer _wireMockServer;
+        private DaprClient _daprClient;
+
+        [SetUp]
+        public void SetUp()
+        {
+            _wireMockServer = WireMockServer.Start();
+
+            var options = new DaprClientOptions
+            {
+                HttpEndpoint = _wireMockServer.Urls[0],
+                Required = true
+            };
+
+            _daprClient = new DaprClient(options);
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            _daprClient?.Dispose();
+            _wireMockServer?.Stop();
+            _wireMockServer?.Dispose();
+        }
+
+        [Test]
+        public void Constructor_WithNullOptions_ShouldThrowArgumentNullException()
+        {
+            Should.Throw<ArgumentNullException>(() => new DaprClient(null));
+        }
+
+        [Test]
+        public async Task InvokeMethodAsync_WithRequestAndResponse_ShouldCallDaprApi()
+        {
+            // Arrange
+            _wireMockServer
+                .Given(Request.Create()
+                    .WithPath("/v1.0/invoke/target-app/method/my-method")
+                    .UsingPost())
+                .RespondWith(Response.Create()
+                    .WithStatusCode(200)
+                    .WithHeader("Content-Type", "application/json")
+                    .WithBody("{\"message\":\"Hello from Dapr\"}"));
+
+            var request = new { Name = "Test" };
+
+            // Act
+            var response = await _daprClient.InvokeMethodAsync<object, TestResponse>(
+                "target-app",
+                "my-method",
+                request);
+
+            // Assert
+            response.ShouldNotBeNull();
+            response.Message.ShouldBe("Hello from Dapr");
+        }
+
+        [Test]
+        public async Task InvokeMethodAsync_WithGetVariant_ShouldCallDaprApi()
+        {
+            // Arrange
+            _wireMockServer
+                .Given(Request.Create()
+                    .WithPath("/v1.0/invoke/target-app/method/get-data")
+                    .UsingGet())
+                .RespondWith(Response.Create()
+                    .WithStatusCode(200)
+                    .WithHeader("Content-Type", "application/json")
+                    .WithBody("{\"value\":42}"));
+
+            // Act
+            var response = await _daprClient.InvokeMethodAsync<TestResponse>(
+                "target-app",
+                "get-data");
+
+            // Assert
+            response.ShouldNotBeNull();
+            response.Value.ShouldBe(42);
+        }
+
+        [Test]
+        public async Task InvokeMethodAsync_WithFireAndForget_ShouldNotExpectResponse()
+        {
+            // Arrange
+            _wireMockServer
+                .Given(Request.Create()
+                    .WithPath("/v1.0/invoke/target-app/method/notify")
+                    .UsingPost())
+                .RespondWith(Response.Create()
+                    .WithStatusCode(200));
+
+            var request = new { Event = "TestEvent" };
+
+            // Act & Assert (should not throw)
+            await _daprClient.InvokeMethodAsync("target-app", "notify", request);
+        }
+
+        [Test]
+        public void InvokeMethodAsync_WithNullAppId_ShouldThrowArgumentNullException()
+        {
+            Should.Throw<ArgumentNullException>(async () =>
+                await _daprClient.InvokeMethodAsync<object, object>(null, "method", new { }));
+        }
+
+        [Test]
+        public void InvokeMethodAsync_WithEmptyAppId_ShouldThrowArgumentNullException()
+        {
+            Should.Throw<ArgumentNullException>(async () =>
+                await _daprClient.InvokeMethodAsync<object, object>("", "method", new { }));
+        }
+
+        [Test]
+        public void InvokeMethodAsync_WithNullMethodName_ShouldThrowArgumentNullException()
+        {
+            Should.Throw<ArgumentNullException>(async () =>
+                await _daprClient.InvokeMethodAsync<object, object>("app-id", null, new { }));
+        }
+
+        [Test]
+        public void InvokeMethodAsync_WithEmptyMethodName_ShouldThrowArgumentNullException()
+        {
+            Should.Throw<ArgumentNullException>(async () =>
+                await _daprClient.InvokeMethodAsync<object, object>("app-id", "", new { }));
+        }
+
+        [Test]
+        public void InvokeMethodAsync_WhenDaprUnavailable_ShouldThrowDaprException()
+        {
+            // Arrange - create client pointing to non-existent Dapr
+            var badOptions = new DaprClientOptions
+            {
+                HttpEndpoint = "http://localhost:9999",
+                Required = true,
+                HttpTimeout = TimeSpan.FromSeconds(1)
+            };
+
+            using (var badClient = new DaprClient(badOptions))
+            {
+                // Act & Assert
+                var exception = Should.Throw<DaprException>(async () =>
+                    await badClient.InvokeMethodAsync<object, object>("app", "method", new { }));
+
+                exception.Message.ShouldContain("Failed to communicate with Dapr");
+                exception.Message.ShouldContain("dapr run");
+            }
+        }
+
+        [Test]
+        public async Task InvokeMethodAsync_WithApiToken_ShouldIncludeTokenHeader()
+        {
+            // Arrange
+            var optionsWithToken = new DaprClientOptions
+            {
+                HttpEndpoint = _wireMockServer.Urls[0],
+                ApiToken = "secret-token-12345"
+            };
+
+            using (var clientWithToken = new DaprClient(optionsWithToken))
+            {
+                _wireMockServer
+                    .Given(Request.Create()
+                        .WithPath("/v1.0/invoke/app/method/test")
+                        .WithHeader("dapr-api-token", "secret-token-12345")
+                        .UsingPost())
+                    .RespondWith(Response.Create()
+                        .WithStatusCode(200)
+                        .WithBody("{\"result\":\"ok\"}"));
+
+                // Act
+                var response = await clientWithToken.InvokeMethodAsync<object, TestResponse>(
+                    "app",
+                    "test",
+                    new { });
+
+                // Assert
+                response.Result.ShouldBe("ok");
+            }
+        }
+
+        [Test]
+        public async Task InvokeMethodAsync_WithNullRequestBody_ShouldSucceed()
+        {
+            // Arrange
+            _wireMockServer
+                .Given(Request.Create()
+                    .WithPath("/v1.0/invoke/app/method/test")
+                    .UsingPost())
+                .RespondWith(Response.Create()
+                    .WithStatusCode(200)
+                    .WithBody("{\"value\":123}"));
+
+            // Act
+            var response = await _daprClient.InvokeMethodAsync<object, TestResponse>(
+                "app",
+                "test",
+                null);
+
+            // Assert
+            response.Value.ShouldBe(123);
+        }
+
+        [Test]
+        public async Task InvokeMethodAsync_WithEmptyResponse_ShouldReturnDefault()
+        {
+            // Arrange
+            _wireMockServer
+                .Given(Request.Create()
+                    .WithPath("/v1.0/invoke/app/method/test")
+                    .UsingPost())
+                .RespondWith(Response.Create()
+                    .WithStatusCode(200)
+                    .WithBody(string.Empty));
+
+            // Act
+            var response = await _daprClient.InvokeMethodAsync<object, TestResponse>(
+                "app",
+                "test",
+                new { });
+
+            // Assert
+            response.ShouldBeNull();
+        }
+
+        private class TestResponse
+        {
+            public string Message { get; set; }
+
+            public int Value { get; set; }
+
+            public string Result { get; set; }
+        }
+    }
+}
