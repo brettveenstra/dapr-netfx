@@ -26,6 +26,11 @@ namespace DaprNetFx.Http
             ServicePointManager.Expect100Continue = false;
             ServicePointManager.UseNagleAlgorithm = false;
 
+            // DNS refresh: Recycle connections every 2 minutes to pick up DNS changes
+            // Critical for Azure/Kubernetes where Dapr endpoint IPs change during scaling/deployments
+            // Without this, singleton HttpClient caches DNS indefinitely causing "Dapr unavailable" errors
+            ServicePointManager.DnsRefreshTimeout = 120000; // 2 minutes in milliseconds
+
             // Singleton HttpClient (no HttpClientFactory in .NET Framework)
             SharedHttpClient = new HttpClient();
             SharedHttpClient.DefaultRequestHeaders.Add("User-Agent", "DaprNetFx/0.1.0-alpha");
