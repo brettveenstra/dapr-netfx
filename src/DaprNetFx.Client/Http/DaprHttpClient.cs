@@ -44,6 +44,13 @@ namespace DaprNetFx.Http
         {
             _options = options ?? throw new ArgumentNullException(nameof(options));
 
+            // Configure ServicePoint for the Dapr endpoint to enable connection recycling
+            // Defense-in-depth: Even if DNS returns same IP, recycling connections helps
+            // recover from transient network issues (Azure load balancer failures, etc.)
+            var servicePoint = ServicePointManager.FindServicePoint(new Uri(_options.HttpEndpoint));
+            servicePoint.ConnectionLeaseTimeout = 120000; // 2 minutes
+            servicePoint.ConnectionLimit = 50; // Max concurrent connections to this endpoint
+
             // Note: Cannot set timeout on shared HttpClient (would affect all instances)
             // Timeout is enforced per-request using cancellation tokens
         }
