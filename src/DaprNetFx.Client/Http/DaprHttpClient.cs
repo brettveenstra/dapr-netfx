@@ -79,8 +79,10 @@ namespace DaprNetFx.Http
                 request.Content = new StringContent(json, Encoding.UTF8, "application/json");
             }
 
-            var response = await SendRequestAsync(request).ConfigureAwait(false);
-            return await DeserializeResponseAsync<TResponse>(response).ConfigureAwait(false);
+            using (var response = await SendRequestAsync(request).ConfigureAwait(false))
+            {
+                return await DeserializeResponseAsync<TResponse>(response).ConfigureAwait(false);
+            }
         }
 
         /// <summary>
@@ -94,8 +96,10 @@ namespace DaprNetFx.Http
             var requestUri = BuildUri(path);
             var request = CreateRequest(HttpMethod.Get, requestUri);
 
-            var response = await SendRequestAsync(request).ConfigureAwait(false);
-            return await DeserializeResponseAsync<TResponse>(response).ConfigureAwait(false);
+            using (var response = await SendRequestAsync(request).ConfigureAwait(false))
+            {
+                return await DeserializeResponseAsync<TResponse>(response).ConfigureAwait(false);
+            }
         }
 
         private HttpRequestMessage CreateRequest(HttpMethod method, Uri uri)
