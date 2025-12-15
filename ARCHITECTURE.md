@@ -45,7 +45,7 @@ DaprNetFx.Client              → Core Dapr client (service invocation, state, p
 **Integration Packages** (optional, consumer choice):
 ```
 DaprNetFx.AspNet              → ASP.NET WebAPI DI integration (POC1 ✅)
-DaprNetFx.AspNet.Callbacks    → Inbound service invocation handlers (POC2)
+                                 Inbound callbacks (POC2 ✅)
 DaprNetFx.AspNet.SelfHost     → OWIN self-hosting support (POC3)
 DaprNetFx.Autofac             → Autofac container integration (POC2/3)
 ```
@@ -202,15 +202,20 @@ JsonConvert.SerializeObject(obj);
 
 **POC1 - Dependency Injection Integration** (✅ Complete):
 - `config.UseDapr()` fluent registration in WebApiConfig
-- `DaprApiController` base class with protected Dapr property
+- `DaprApiController` base class with protected `Dapr` property (outbound)
 - Wraps existing IDependencyResolver (preserves user's DI setup)
 - Singleton DaprClient lifecycle managed by resolver
 - Enables outbound service invocation from controllers
 
-**POC2 - Callback Handlers** (Planned):
-- Dapr → App inbound callbacks via WebAPI endpoints
-- Attribute routing: `[DaprRoute("method-name")]`
-- Message handlers for Dapr headers (dapr-app-id, etc.)
+**POC2 - Inbound Callback Handlers** (✅ Complete):
+- Dapr → App inbound callbacks via standard WebAPI endpoints
+- `[DaprCallback]` marker attribute for callback actions (documentation)
+- `CallbackContext` property on `DaprApiController` exposes Dapr metadata
+  - `CallerAppId` - Which service invoked this callback
+  - `CallerNamespace` - Kubernetes namespace of caller
+  - `CalleeAppId` - Your app's Dapr app ID
+- No special routing or middleware required (uses standard HTTP routing)
+- Graceful degradation when HttpContext unavailable (unit tests)
 - Compatible with existing WebAPI, MVC, OWIN hosting
 
 ## Security Considerations
@@ -271,18 +276,22 @@ JsonConvert.SerializeObject(obj);
 - Dapr → App callbacks (inbound service invocation)
 - Visual Studio F5 debug validation
 
-### POC2: Building Blocks + Packaging
+### POC2: Building Blocks + Packaging (🔄 In Progress)
 
 **Goal**: Add state, pub/sub, callbacks, NuGet packaging, DI integration
 
-**Scope**:
-- Inbound service invocation (Dapr → App callbacks)
+**Completed** (✅):
+- Inbound service invocation (Dapr → App callbacks) via `DaprApiController.CallbackContext`
+- `[DaprCallback]` attribute for marking callback endpoints
+- Standard HTTP routing (no special middleware)
+- Comprehensive test coverage (~19 new tests)
+
+**Remaining**:
 - State Management API
 - Pub/Sub API
 - NuGet packages validated
 - `DaprNetFx.Autofac` integration package (optional)
-- `DaprNetFx.AspNet.Callbacks` package
-- Focused samples (state, pub/sub)
+- Focused samples (state, pub/sub, callbacks)
 
 ### POC3: Production Readiness
 

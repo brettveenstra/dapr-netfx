@@ -25,12 +25,14 @@ DaprNetFx enables .NET Framework 4.x applications to leverage [Dapr](https://dap
 
 ## Status
 
-🚧 **POC Phase** - POC1 Complete, POC2 In Planning
+🚧 **POC Phase** - POC1 Complete, POC2 Callbacks Complete
 
 ### POC Roadmap
 
 - **POC1** ✅ (Complete): Core client, service invocation (outbound), ASP.NET WebAPI DI integration, sample application
-- **POC2** (Planned): State Management, Pub/Sub, service callbacks (inbound), NuGet packaging, Autofac integration
+- **POC2** 🔄 (In Progress):
+  - ✅ Service callbacks (inbound) - Dapr → App invocation complete
+  - ⏳ State Management, Pub/Sub, NuGet packaging, Autofac integration
 - **POC3** (Planned): Production readiness, OWIN support, performance optimization, real Dapr integration tests
 
 ## Prerequisites
@@ -102,7 +104,7 @@ public static class WebApiConfig
     }
 }
 
-// Controller
+// Controller (Outbound)
 public class OrdersController : DaprApiController
 {
     public async Task<IHttpActionResult> Get(string orderId)
@@ -116,6 +118,39 @@ public class OrdersController : DaprApiController
         return Ok(order);
     }
 }
+```
+
+**Inbound Service Invocation (Dapr → App Callbacks)**
+
+```csharp
+// Receive service invocations FROM other Dapr applications
+public class OrdersController : DaprApiController
+{
+    [DaprCallback]  // Marker attribute for callback endpoints
+    [HttpPost]
+    public IHttpActionResult ProcessOrder(Order order)
+    {
+        // Access Dapr metadata about the calling service
+        var callerAppId = this.CallbackContext.CallerAppId;
+        var callerNamespace = this.CallbackContext.CallerNamespace;
+
+        // Check if request came through Dapr (vs direct HTTP)
+        if (this.CallbackContext.HasDaprHeaders)
+        {
+            // Process order from Dapr-invoked request
+            // Optional: Make outbound calls back to caller
+            var result = await Dapr.InvokeMethodAsync<Inventory>(
+                appId: callerAppId,
+                methodName: "confirm-reservation"
+            );
+        }
+
+        return Ok(new { orderId = order.Id, status = "processed" });
+    }
+}
+
+// Test callback with Dapr CLI
+// dapr invoke --app-id order-service --method ProcessOrder --verb POST --data '{"id":123}'
 ```
 
 ## Building from Source
@@ -154,8 +189,10 @@ dotnet test
 ### Optional Integration Packages
 
 **DaprNetFx.AspNet** - ASP.NET WebAPI dependency injection integration
-- `config.UseDapr()` fluent registration API
-- `DaprApiController` base class with Dapr property
+- `config.UseDapr()` fluent registration API for outbound calls
+- `DaprApiController` base class with `Dapr` property (outbound)
+- `DaprApiController` base class with `CallbackContext` property (inbound)
+- `[DaprCallback]` attribute for marking callback endpoints
 - Wraps existing IDependencyResolver (preserves user's DI setup)
 - Singleton DaprClient lifecycle management
 
@@ -164,10 +201,6 @@ dotnet test
 - Fluent registration extensions
 - Lifetime management for DaprClient
 
-**DaprNetFx.AspNet.Callbacks** (POC2) - Inbound service invocation
-- Dapr → App callbacks via WebAPI endpoints
-- Attribute routing for callback handlers
-- Message handlers for Dapr headers
 
 **DaprNetFx.AspNet.SelfHost** (POC3) - OWIN self-hosting
 - Console apps, Windows Services
