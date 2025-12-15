@@ -25,13 +25,13 @@ DaprNetFx enables .NET Framework 4.x applications to leverage [Dapr](https://dap
 
 ## Status
 
-🚧 **POC Phase** - Currently implementing POC1 (Bidirectional Basics)
+🚧 **POC Phase** - POC1 Complete, POC2 In Planning
 
 ### POC Roadmap
 
-- **POC1** (In Progress): Service invocation bidirectional communication
-- **POC2** (Planned): State Management, Pub/Sub, NuGet packaging
-- **POC3** (Planned): Production readiness, OWIN support, performance optimization
+- **POC1** ✅ (Complete): Core client, service invocation (outbound), ASP.NET WebAPI DI integration, sample application
+- **POC2** (Planned): State Management, Pub/Sub, service callbacks (inbound), NuGet packaging, Autofac integration
+- **POC3** (Planned): Production readiness, OWIN support, performance optimization, real Dapr integration tests
 
 ## Prerequisites
 
@@ -42,25 +42,80 @@ DaprNetFx enables .NET Framework 4.x applications to leverage [Dapr](https://dap
 
 ## Quick Start
 
-> **Note**: SDK not yet published. This section will be updated when NuGet packages are available (POC2).
+> **Note**: SDK not yet published to NuGet (planned for POC2). Build from source for now.
 
-### Installation (Future)
+### Installation (POC2+)
 
 ```powershell
 Install-Package DaprNetFx.Client
 Install-Package DaprNetFx.AspNet  # For ASP.NET WebAPI integration
 ```
 
-### Usage Example (Future)
+### Usage Examples
+
+**Service Invocation (Console/Library)**
 
 ```csharp
-// Service invocation example
-var daprClient = new DaprClient();
-var result = await daprClient.InvokeMethodAsync<MyRequest, MyResponse>(
-    "target-service",
-    "method-name",
-    request
-);
+using DaprNetFx;
+
+// Default configuration (localhost:3500)
+using (var daprClient = new DaprClient())
+{
+    var result = await daprClient.InvokeMethodAsync<MyRequest, MyResponse>(
+        appId: "order-service",
+        methodName: "process-order",
+        request: myRequest
+    );
+}
+
+// Custom configuration
+var options = new DaprClientOptions
+{
+    HttpEndpoint = "http://localhost:3500",
+    HttpTimeout = TimeSpan.FromSeconds(30),
+    Required = true // Fail-fast if Dapr unavailable
+};
+using (var daprClient = new DaprClient(options))
+{
+    var result = await daprClient.InvokeMethodAsync<MyResponse>(
+        appId: "inventory-service",
+        methodName: "check-stock"
+    );
+}
+```
+
+**ASP.NET WebAPI Integration**
+
+```csharp
+// WebApiConfig.cs
+public static class WebApiConfig
+{
+    public static void Register(HttpConfiguration config)
+    {
+        // Register Dapr with dependency injection
+        config.UseDapr(new DaprClientOptions
+        {
+            HttpEndpoint = ConfigurationManager.AppSettings["Dapr:HttpEndpoint"]
+        });
+
+        config.MapHttpAttributeRoutes();
+    }
+}
+
+// Controller
+public class OrdersController : DaprApiController
+{
+    public async Task<IHttpActionResult> Get(string orderId)
+    {
+        // Dapr property provided by base class
+        var order = await Dapr.InvokeMethodAsync<Order>(
+            appId: "order-service",
+            methodName: $"orders/{orderId}"
+        );
+
+        return Ok(order);
+    }
+}
 ```
 
 ## Building from Source
@@ -98,15 +153,21 @@ dotnet test
 
 ### Optional Integration Packages
 
-**DaprNetFx.AspNet** - ASP.NET WebAPI integration
-- Dapr → App callbacks via WebAPI
-- Message handlers for Dapr headers
-- Attribute routing support
+**DaprNetFx.AspNet** - ASP.NET WebAPI dependency injection integration
+- `config.UseDapr()` fluent registration API
+- `DaprApiController` base class with Dapr property
+- Wraps existing IDependencyResolver (preserves user's DI setup)
+- Singleton DaprClient lifecycle management
 
 **DaprNetFx.Autofac** (POC2) - Autofac container integration
 - Separate package to avoid forcing Autofac on all consumers
 - Fluent registration extensions
 - Lifetime management for DaprClient
+
+**DaprNetFx.AspNet.Callbacks** (POC2) - Inbound service invocation
+- Dapr → App callbacks via WebAPI endpoints
+- Attribute routing for callback handlers
+- Message handlers for Dapr headers
 
 **DaprNetFx.AspNet.SelfHost** (POC3) - OWIN self-hosting
 - Console apps, Windows Services
@@ -123,20 +184,24 @@ dotnet test
 ```
 DaprNetFx/
 ├── src/
-│   ├── DaprNetFx.Client/              # Core SDK (zero DI deps)
-│   ├── DaprNetFx.AspNet/              # ASP.NET WebAPI adapter
+│   ├── DaprNetFx.Client/              # Core SDK (zero DI deps) ✅
+│   ├── DaprNetFx.AspNet/              # ASP.NET WebAPI DI integration ✅
 │   ├── DaprNetFx.Autofac/             # Autofac integration (POC2)
+│   ├── DaprNetFx.AspNet.Callbacks/    # Inbound service invocation (POC2)
 │   └── DaprNetFx.AspNet.SelfHost/     # OWIN self-host adapter (POC3)
 ├── test/
-│   ├── DaprNetFx.Client.Tests/        # Unit tests (WireMock)
-│   └── DaprNetFx.Client.IntegrationTests/  # Integration tests (POC3)
+│   ├── DaprNetFx.Client.Tests/        # Client unit tests (WireMock) ✅
+│   ├── DaprNetFx.AspNet.Tests/        # AspNet unit tests (FakeItEasy) ✅
+│   └── DaprNetFx.IntegrationTests/    # Real Dapr integration tests (POC3)
 ├── samples/
-│   ├── ServiceInvocationSample/       # POC1 sample
+│   ├── ServiceInvocationSample/       # Console app sample ✅
 │   ├── StateManagementSample/         # POC2 sample
 │   └── PubSubSample/                  # POC2 sample
 └── docs/
     └── ARCHITECTURE.md                # Architecture documentation
 ```
+
+**POC1 Status**: ✅ marks completed components (57 tests total: 21 client + 36 AspNet)
 
 ## Deployment Patterns
 

@@ -44,7 +44,8 @@ DaprNetFx.Client              → Core Dapr client (service invocation, state, p
 
 **Integration Packages** (optional, consumer choice):
 ```
-DaprNetFx.AspNet              → ASP.NET WebAPI integration
+DaprNetFx.AspNet              → ASP.NET WebAPI DI integration (POC1 ✅)
+DaprNetFx.AspNet.Callbacks    → Inbound service invocation handlers (POC2)
 DaprNetFx.AspNet.SelfHost     → OWIN self-hosting support (POC3)
 DaprNetFx.Autofac             → Autofac container integration (POC2/3)
 ```
@@ -199,11 +200,18 @@ JsonConvert.SerializeObject(obj);
 
 ### ASP.NET WebAPI Integration
 
-POC1 targets ASP.NET WebAPI as universal entry point:
-- Dapr → App callbacks via WebAPI endpoints
-- Attribute routing: `[Route("api/invoke")]`
-- Message handlers for Dapr headers
-- Compatible with Web Forms, MVC, OWIN hosting
+**POC1 - Dependency Injection Integration** (✅ Complete):
+- `config.UseDapr()` fluent registration in WebApiConfig
+- `DaprApiController` base class with protected Dapr property
+- Wraps existing IDependencyResolver (preserves user's DI setup)
+- Singleton DaprClient lifecycle managed by resolver
+- Enables outbound service invocation from controllers
+
+**POC2 - Callback Handlers** (Planned):
+- Dapr → App inbound callbacks via WebAPI endpoints
+- Attribute routing: `[DaprRoute("method-name")]`
+- Message handlers for Dapr headers (dapr-app-id, etc.)
+- Compatible with existing WebAPI, MVC, OWIN hosting
 
 ## Security Considerations
 
@@ -241,32 +249,40 @@ POC1 targets ASP.NET WebAPI as universal entry point:
 
 ## POC Roadmap
 
-### POC1: Bidirectional Basics (In Progress)
+### POC1: Core Client & Outbound Invocation (✅ Complete)
 
-**Goal**: Prove .NET Framework ↔ Dapr works
+**Goal**: Prove .NET Framework → Dapr works for outbound service invocation
 
-**Scope**:
-- Service invocation (App → Dapr, Dapr → App)
-- WebAPI adapter
-- WireMock testing
-- Visual Studio F5 debug
+**Actual Scope**:
+- Service invocation (App → Dapr) - outbound only
+- ASP.NET WebAPI dependency injection integration
+- Comprehensive test coverage (WireMock, FakeItEasy)
+- Console application sample
 
 **Deliverables**:
-- `DaprNetFx.Client`
-- `DaprNetFx.AspNet`
-- `ServiceInvocationSample`
-- Unit tests (WireMock)
+- ✅ `DaprNetFx.Client` - Core SDK with service invocation
+- ✅ `DaprNetFx.AspNet` - WebAPI DI integration (config.UseDapr, DaprApiController)
+- ✅ `ServiceInvocationSample` - Console app demonstrating three usage patterns
+- ✅ Test suites - 57 tests total (21 client + 36 AspNet)
+  - `DaprNetFx.Client.Tests` - WireMock HTTP mocking
+  - `DaprNetFx.AspNet.Tests` - FakeItEasy DI mocking
+
+**Deferred to POC2**:
+- Dapr → App callbacks (inbound service invocation)
+- Visual Studio F5 debug validation
 
 ### POC2: Building Blocks + Packaging
 
-**Goal**: Add state, pub/sub, NuGet packaging, DI integration
+**Goal**: Add state, pub/sub, callbacks, NuGet packaging, DI integration
 
 **Scope**:
+- Inbound service invocation (Dapr → App callbacks)
 - State Management API
 - Pub/Sub API
 - NuGet packages validated
 - `DaprNetFx.Autofac` integration package (optional)
-- Focused samples
+- `DaprNetFx.AspNet.Callbacks` package
+- Focused samples (state, pub/sub)
 
 ### POC3: Production Readiness
 
