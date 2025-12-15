@@ -38,7 +38,9 @@ namespace DaprNetFx.Http
         public DaprHttpClient(DaprClientOptions options)
         {
             _options = options ?? throw new ArgumentNullException(nameof(options));
-            SharedHttpClient.Timeout = _options.HttpTimeout;
+
+            // Note: Cannot set timeout on shared HttpClient (would affect all instances)
+            // Timeout is enforced per-request using cancellation tokens
         }
 
         /// <inheritdoc/>
@@ -108,11 +110,18 @@ namespace DaprNetFx.Http
         {
             try
             {
-                var response = await SharedHttpClient.SendAsync(request).ConfigureAwait(false);
-                response.EnsureSuccessStatusCode();
-                return response;
+                // Use cancellation token for per-request timeout (singleton HttpClient pattern)
+                using (var cts = new System.Threading.CancellationTokenSource(_options.HttpTimeout))
+                {
+                    var response = await SharedHttpClient.SendAsync(request, cts.Token)
+                        .ConfigureAwait(false);
+                    response.EnsureSuccessStatusCode();
+                    return response;
+                }
             }
-            catch (HttpRequestException ex) when (_options.Required)
+            catch (Exception ex) when (
+                (ex is HttpRequestException || ex is System.Threading.Tasks.TaskCanceledException)
+                && _options.Required)
             {
                 throw new DaprException(
                     $"Failed to communicate with Dapr at {_options.HttpEndpoint}. " +
