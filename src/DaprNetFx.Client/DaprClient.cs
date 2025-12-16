@@ -5,6 +5,7 @@ namespace DaprNetFx
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Threading;
     using System.Threading.Tasks;
     using DaprNetFx.Configuration;
     using DaprNetFx.Http;
@@ -53,6 +54,7 @@ namespace DaprNetFx
         /// <param name="appId">The target application ID.</param>
         /// <param name="methodName">The method name to invoke.</param>
         /// <param name="request">The request body.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>A task representing the asynchronous operation with the response.</returns>
         /// <exception cref="ArgumentException">
         /// Thrown when <paramref name="appId"/> or <paramref name="methodName"/> is null or whitespace.
@@ -63,7 +65,8 @@ namespace DaprNetFx
         public async Task<TResponse> InvokeMethodAsync<TRequest, TResponse>(
             string appId,
             string methodName,
-            TRequest request)
+            TRequest request,
+            CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(appId))
             {
@@ -76,7 +79,7 @@ namespace DaprNetFx
             }
 
             var path = $"/v1.0/invoke/{appId}/method/{methodName}";
-            return await _httpClient.PostJsonAsync<TRequest, TResponse>(path, request)
+            return await _httpClient.PostJsonAsync<TRequest, TResponse>(path, request, cancellationToken)
                 .ConfigureAwait(false);
         }
 
@@ -86,6 +89,7 @@ namespace DaprNetFx
         /// <typeparam name="TResponse">The response body type.</typeparam>
         /// <param name="appId">The target application ID.</param>
         /// <param name="methodName">The method name to invoke.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>A task representing the asynchronous operation with the response.</returns>
         /// <exception cref="ArgumentException">
         /// Thrown when <paramref name="appId"/> or <paramref name="methodName"/> is null or whitespace.
@@ -95,7 +99,8 @@ namespace DaprNetFx
         /// </exception>
         public async Task<TResponse> InvokeMethodAsync<TResponse>(
             string appId,
-            string methodName)
+            string methodName,
+            CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(appId))
             {
@@ -108,7 +113,7 @@ namespace DaprNetFx
             }
 
             var path = $"/v1.0/invoke/{appId}/method/{methodName}";
-            return await _httpClient.GetJsonAsync<TResponse>(path).ConfigureAwait(false);
+            return await _httpClient.GetJsonAsync<TResponse>(path, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -118,6 +123,7 @@ namespace DaprNetFx
         /// <param name="appId">The target application ID.</param>
         /// <param name="methodName">The method name to invoke.</param>
         /// <param name="request">The request body.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
         /// <exception cref="ArgumentNullException">
         /// Thrown when <paramref name="appId"/> or <paramref name="methodName"/> is null.
@@ -128,9 +134,10 @@ namespace DaprNetFx
         public async Task InvokeMethodAsync<TRequest>(
             string appId,
             string methodName,
-            TRequest request)
+            TRequest request,
+            CancellationToken cancellationToken = default)
         {
-            await InvokeMethodAsync<TRequest, object>(appId, methodName, request)
+            await InvokeMethodAsync<TRequest, object>(appId, methodName, request, cancellationToken)
                 .ConfigureAwait(false);
         }
 
@@ -142,6 +149,7 @@ namespace DaprNetFx
         /// <param name="key">The state key.</param>
         /// <param name="value">The state value to save.</param>
         /// <param name="options">Optional state options (concurrency, consistency, ETag, TTL).</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
         /// <exception cref="ArgumentException">
         /// Thrown when <paramref name="storeName"/> or <paramref name="key"/> is null or whitespace.
@@ -153,7 +161,8 @@ namespace DaprNetFx
             string storeName,
             string key,
             TValue value,
-            StateOptions options = null)
+            StateOptions options = null,
+            CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(storeName))
             {
@@ -195,7 +204,7 @@ namespace DaprNetFx
 
             var path = $"/v1.0/state/{storeName}";
             var requestArray = new[] { stateRequest };
-            await _httpClient.PostJsonNoContentAsync(path, requestArray).ConfigureAwait(false);
+            await _httpClient.PostJsonNoContentAsync(path, requestArray, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -205,6 +214,7 @@ namespace DaprNetFx
         /// <param name="storeName">The name of the state store.</param>
         /// <param name="key">The state key.</param>
         /// <param name="consistency">Optional consistency mode (strong or eventual).</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>
         /// A task representing the asynchronous operation with the state value.
         /// Returns default(TValue) if the key does not exist.
@@ -218,7 +228,8 @@ namespace DaprNetFx
         public async Task<TValue> GetStateAsync<TValue>(
             string storeName,
             string key,
-            ConsistencyMode? consistency = null)
+            ConsistencyMode? consistency = null,
+            CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(storeName))
             {
@@ -241,7 +252,7 @@ namespace DaprNetFx
                 };
             }
 
-            return await _httpClient.GetJsonAsync<TValue>(path, queryParams).ConfigureAwait(false);
+            return await _httpClient.GetJsonAsync<TValue>(path, queryParams, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -250,6 +261,7 @@ namespace DaprNetFx
         /// <param name="storeName">The name of the state store.</param>
         /// <param name="key">The state key to delete.</param>
         /// <param name="options">Optional state options (concurrency, consistency, ETag).</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
         /// <exception cref="ArgumentException">
         /// Thrown when <paramref name="storeName"/> or <paramref name="key"/> is null or whitespace.
@@ -260,7 +272,8 @@ namespace DaprNetFx
         public async Task DeleteStateAsync(
             string storeName,
             string key,
-            StateOptions options = null)
+            StateOptions options = null,
+            CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(storeName))
             {
@@ -294,7 +307,7 @@ namespace DaprNetFx
                 }
             }
 
-            await _httpClient.DeleteAsync(path, queryParams).ConfigureAwait(false);
+            await _httpClient.DeleteAsync(path, queryParams, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -303,6 +316,7 @@ namespace DaprNetFx
         /// <typeparam name="TValue">The state value type.</typeparam>
         /// <param name="storeName">The name of the state store.</param>
         /// <param name="items">The collection of state items to save.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
         /// <exception cref="ArgumentException">
         /// Thrown when <paramref name="storeName"/> is null or whitespace, or <paramref name="items"/> is null or empty.
@@ -312,7 +326,8 @@ namespace DaprNetFx
         /// </exception>
         public async Task SaveBulkStateAsync<TValue>(
             string storeName,
-            IEnumerable<StateItem<TValue>> items)
+            IEnumerable<StateItem<TValue>> items,
+            CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(storeName))
             {
@@ -338,7 +353,7 @@ namespace DaprNetFx
             }).ToArray();
 
             var path = $"/v1.0/state/{storeName}";
-            await _httpClient.PostJsonNoContentAsync(path, requestArray).ConfigureAwait(false);
+            await _httpClient.PostJsonNoContentAsync(path, requestArray, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -348,6 +363,7 @@ namespace DaprNetFx
         /// <param name="storeName">The name of the state store.</param>
         /// <param name="keys">The collection of state keys to retrieve.</param>
         /// <param name="parallelism">Optional parallelism level for concurrent retrieval.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>A task representing the asynchronous operation with the collection of state items.</returns>
         /// <exception cref="ArgumentException">
         /// Thrown when <paramref name="storeName"/> is null or whitespace, or <paramref name="keys"/> is null or empty.
@@ -358,7 +374,8 @@ namespace DaprNetFx
         public async Task<IEnumerable<StateItem<TValue>>> GetBulkStateAsync<TValue>(
             string storeName,
             IEnumerable<string> keys,
-            int? parallelism = null)
+            int? parallelism = null,
+            CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(storeName))
             {
@@ -383,7 +400,7 @@ namespace DaprNetFx
             };
 
             var path = $"/v1.0/state/{storeName}/bulk";
-            var response = await _httpClient.PostJsonArrayAsync<BulkGetRequest, BulkStateItem>(path, request)
+            var response = await _httpClient.PostJsonArrayAsync<BulkGetRequest, BulkStateItem>(path, request, cancellationToken)
                 .ConfigureAwait(false);
 
             return response.Select(item => new StateItem<TValue>
@@ -401,6 +418,7 @@ namespace DaprNetFx
         /// </summary>
         /// <param name="storeName">The name of the state store.</param>
         /// <param name="keys">The collection of state keys to delete.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
         /// <exception cref="ArgumentException">
         /// Thrown when <paramref name="storeName"/> is null or whitespace, or <paramref name="keys"/> is null or empty.
@@ -410,7 +428,8 @@ namespace DaprNetFx
         /// </exception>
         public async Task DeleteBulkStateAsync(
             string storeName,
-            IEnumerable<string> keys)
+            IEnumerable<string> keys,
+            CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(storeName))
             {
@@ -434,7 +453,7 @@ namespace DaprNetFx
             }).ToArray();
 
             var path = $"/v1.0/state/{storeName}";
-            await _httpClient.PostJsonNoContentAsync(path, requestArray).ConfigureAwait(false);
+            await _httpClient.PostJsonNoContentAsync(path, requestArray, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -443,6 +462,7 @@ namespace DaprNetFx
         /// </summary>
         /// <param name="storeName">The name of the state store (must support transactions).</param>
         /// <param name="operations">The collection of state operations to execute atomically.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
         /// <exception cref="ArgumentException">
         /// Thrown when <paramref name="storeName"/> is null or whitespace, or <paramref name="operations"/> is null or empty.
@@ -452,7 +472,8 @@ namespace DaprNetFx
         /// </exception>
         public async Task ExecuteStateTransactionAsync(
             string storeName,
-            IEnumerable<StateTransactionRequest> operations)
+            IEnumerable<StateTransactionRequest> operations,
+            CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(storeName))
             {
@@ -487,7 +508,7 @@ namespace DaprNetFx
             };
 
             var path = $"/v1.0/state/{storeName}/transaction";
-            await _httpClient.PostJsonNoContentAsync(path, transactionRequest).ConfigureAwait(false);
+            await _httpClient.PostJsonNoContentAsync(path, transactionRequest, cancellationToken).ConfigureAwait(false);
         }
 
         /// <inheritdoc/>

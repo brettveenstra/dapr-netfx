@@ -9,6 +9,7 @@ namespace DaprNetFx.Http
     using System.Net.Http;
     using System.Net.Http.Headers;
     using System.Text;
+    using System.Threading;
     using System.Threading.Tasks;
     using Newtonsoft.Json;
 
@@ -92,10 +93,12 @@ namespace DaprNetFx.Http
         /// <typeparam name="TResponse">The response body type.</typeparam>
         /// <param name="path">The API path (e.g., "/v1.0/invoke/app-id/method/method-name").</param>
         /// <param name="requestBody">The request body.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>The deserialized response.</returns>
         internal async Task<TResponse> PostJsonAsync<TRequest, TResponse>(
             string path,
-            TRequest requestBody)
+            TRequest requestBody,
+            CancellationToken cancellationToken = default)
         {
             var requestUri = BuildUri(path);
             var request = CreateRequest(HttpMethod.Post, requestUri);
@@ -106,7 +109,7 @@ namespace DaprNetFx.Http
                 request.Content = new StringContent(json, Encoding.UTF8, "application/json");
             }
 
-            using (var response = await SendRequestAsync(request).ConfigureAwait(false))
+            using (var response = await SendRequestAsync(request, cancellationToken).ConfigureAwait(false))
             {
                 return await DeserializeResponseAsync<TResponse>(response).ConfigureAwait(false);
             }
@@ -117,10 +120,13 @@ namespace DaprNetFx.Http
         /// </summary>
         /// <typeparam name="TResponse">The response body type.</typeparam>
         /// <param name="path">The API path.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>The deserialized response.</returns>
-        internal async Task<TResponse> GetJsonAsync<TResponse>(string path)
+        internal async Task<TResponse> GetJsonAsync<TResponse>(
+            string path,
+            CancellationToken cancellationToken = default)
         {
-            return await GetJsonAsync<TResponse>(path, null).ConfigureAwait(false);
+            return await GetJsonAsync<TResponse>(path, null, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -129,15 +135,17 @@ namespace DaprNetFx.Http
         /// <typeparam name="TResponse">The response body type.</typeparam>
         /// <param name="path">The API path.</param>
         /// <param name="queryParams">Optional query parameters.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>The deserialized response.</returns>
         internal async Task<TResponse> GetJsonAsync<TResponse>(
             string path,
-            Dictionary<string, string> queryParams)
+            Dictionary<string, string> queryParams,
+            CancellationToken cancellationToken = default)
         {
             var requestUri = BuildUri(path, queryParams);
             var request = CreateRequest(HttpMethod.Get, requestUri);
 
-            using (var response = await SendRequestAsync(request).ConfigureAwait(false))
+            using (var response = await SendRequestAsync(request, cancellationToken).ConfigureAwait(false))
             {
                 return await DeserializeResponseAsync<TResponse>(response).ConfigureAwait(false);
             }
@@ -149,10 +157,12 @@ namespace DaprNetFx.Http
         /// <typeparam name="TRequest">The request body type.</typeparam>
         /// <param name="path">The API path.</param>
         /// <param name="requestBody">The request body.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
         internal async Task PostJsonNoContentAsync<TRequest>(
             string path,
-            TRequest requestBody)
+            TRequest requestBody,
+            CancellationToken cancellationToken = default)
         {
             var requestUri = BuildUri(path);
             var request = CreateRequest(HttpMethod.Post, requestUri);
@@ -163,7 +173,7 @@ namespace DaprNetFx.Http
                 request.Content = new StringContent(json, Encoding.UTF8, "application/json");
             }
 
-            using (var response = await SendRequestAsync(request).ConfigureAwait(false))
+            using (var response = await SendRequestAsync(request, cancellationToken).ConfigureAwait(false))
             {
                 // 204 No Content - no response body to deserialize
             }
@@ -175,15 +185,17 @@ namespace DaprNetFx.Http
         /// <typeparam name="TResponse">The response body type.</typeparam>
         /// <param name="path">The API path.</param>
         /// <param name="queryParams">Optional query parameters.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>A tuple containing the deserialized response and ETag.</returns>
         internal async Task<(TResponse Value, string ETag)> GetJsonWithHeadersAsync<TResponse>(
             string path,
-            Dictionary<string, string> queryParams = null)
+            Dictionary<string, string> queryParams = null,
+            CancellationToken cancellationToken = default)
         {
             var requestUri = BuildUri(path, queryParams);
             var request = CreateRequest(HttpMethod.Get, requestUri);
 
-            using (var response = await SendRequestAsync(request).ConfigureAwait(false))
+            using (var response = await SendRequestAsync(request, cancellationToken).ConfigureAwait(false))
             {
                 var etag = response.Headers.ETag?.Tag;
                 var value = await DeserializeResponseAsync<TResponse>(response).ConfigureAwait(false);
@@ -198,10 +210,12 @@ namespace DaprNetFx.Http
         /// <typeparam name="TResponse">The response array element type.</typeparam>
         /// <param name="path">The API path.</param>
         /// <param name="requestBody">The request body.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>The deserialized array response.</returns>
         internal async Task<TResponse[]> PostJsonArrayAsync<TRequest, TResponse>(
             string path,
-            TRequest requestBody)
+            TRequest requestBody,
+            CancellationToken cancellationToken = default)
         {
             var requestUri = BuildUri(path);
             var request = CreateRequest(HttpMethod.Post, requestUri);
@@ -212,7 +226,7 @@ namespace DaprNetFx.Http
                 request.Content = new StringContent(json, Encoding.UTF8, "application/json");
             }
 
-            using (var response = await SendRequestAsync(request).ConfigureAwait(false))
+            using (var response = await SendRequestAsync(request, cancellationToken).ConfigureAwait(false))
             {
                 var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 
@@ -230,15 +244,17 @@ namespace DaprNetFx.Http
         /// </summary>
         /// <param name="path">The API path.</param>
         /// <param name="queryParams">Optional query parameters.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
         internal async Task DeleteAsync(
             string path,
-            Dictionary<string, string> queryParams = null)
+            Dictionary<string, string> queryParams = null,
+            CancellationToken cancellationToken = default)
         {
             var requestUri = BuildUri(path, queryParams);
             var request = CreateRequest(HttpMethod.Delete, requestUri);
 
-            using (var response = await SendRequestAsync(request).ConfigureAwait(false))
+            using (var response = await SendRequestAsync(request, cancellationToken).ConfigureAwait(false))
             {
                 // 204 No Content - no response body
             }
@@ -257,15 +273,21 @@ namespace DaprNetFx.Http
             return request;
         }
 
-        private async Task<HttpResponseMessage> SendRequestAsync(HttpRequestMessage request)
+        private async Task<HttpResponseMessage> SendRequestAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken = default)
         {
             HttpResponseMessage response = null;
             try
             {
-                // Use cancellation token for per-request timeout (singleton HttpClient pattern)
-                using (var cts = new System.Threading.CancellationTokenSource(_options.HttpTimeout))
+                // Merge user-provided cancellation token with per-request timeout
+                // This allows cancellation from either: explicit user cancellation OR timeout
+                using (var timeoutCts = new CancellationTokenSource(_options.HttpTimeout))
+                using (var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken,
+                    timeoutCts.Token))
                 {
-                    response = await SharedHttpClient.SendAsync(request, cts.Token)
+                    response = await SharedHttpClient.SendAsync(request, linkedCts.Token)
                         .ConfigureAwait(false);
                     response.EnsureSuccessStatusCode();
                     return response; // Caller must dispose
@@ -281,7 +303,7 @@ namespace DaprNetFx.Http
                     $"To disable this check, set Dapr:Required=false in app.config.",
                     ex);
             }
-            catch (System.Threading.Tasks.TaskCanceledException ex) when (_options.Required)
+            catch (TaskCanceledException ex) when (_options.Required)
             {
                 response?.Dispose();
                 throw new DaprException(
