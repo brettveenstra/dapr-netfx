@@ -144,31 +144,51 @@ namespace DaprNetFx.Tests
         }
 
         [Test]
-        public void InvokeMethodAsync_WithNullAppId_ShouldThrowArgumentNullException()
+        public void InvokeMethodAsync_WithNullAppId_ShouldThrowArgumentException()
         {
-            Should.Throw<ArgumentNullException>(async () =>
+            var exception = Should.Throw<ArgumentException>(async () =>
                 await _daprClient.InvokeMethodAsync<object, object>(null, "method", new { }));
+            exception.Message.ShouldContain("cannot be null or whitespace");
         }
 
         [Test]
-        public void InvokeMethodAsync_WithEmptyAppId_ShouldThrowArgumentNullException()
+        public void InvokeMethodAsync_WithEmptyAppId_ShouldThrowArgumentException()
         {
-            Should.Throw<ArgumentNullException>(async () =>
+            var exception = Should.Throw<ArgumentException>(async () =>
                 await _daprClient.InvokeMethodAsync<object, object>("", "method", new { }));
+            exception.Message.ShouldContain("cannot be null or whitespace");
         }
 
         [Test]
-        public void InvokeMethodAsync_WithNullMethodName_ShouldThrowArgumentNullException()
+        public void InvokeMethodAsync_WithWhitespaceAppId_ShouldThrowArgumentException()
         {
-            Should.Throw<ArgumentNullException>(async () =>
+            var exception = Should.Throw<ArgumentException>(async () =>
+                await _daprClient.InvokeMethodAsync<object, object>("   ", "method", new { }));
+            exception.Message.ShouldContain("cannot be null or whitespace");
+        }
+
+        [Test]
+        public void InvokeMethodAsync_WithNullMethodName_ShouldThrowArgumentException()
+        {
+            var exception = Should.Throw<ArgumentException>(async () =>
                 await _daprClient.InvokeMethodAsync<object, object>("app-id", null, new { }));
+            exception.Message.ShouldContain("cannot be null or whitespace");
         }
 
         [Test]
-        public void InvokeMethodAsync_WithEmptyMethodName_ShouldThrowArgumentNullException()
+        public void InvokeMethodAsync_WithEmptyMethodName_ShouldThrowArgumentException()
         {
-            Should.Throw<ArgumentNullException>(async () =>
+            var exception = Should.Throw<ArgumentException>(async () =>
                 await _daprClient.InvokeMethodAsync<object, object>("app-id", "", new { }));
+            exception.Message.ShouldContain("cannot be null or whitespace");
+        }
+
+        [Test]
+        public void InvokeMethodAsync_WithWhitespaceMethodName_ShouldThrowArgumentException()
+        {
+            var exception = Should.Throw<ArgumentException>(async () =>
+                await _daprClient.InvokeMethodAsync<object, object>("app-id", "   ", new { }));
+            exception.Message.ShouldContain("cannot be null or whitespace");
         }
 
         [Test]

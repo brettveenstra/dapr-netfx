@@ -50,8 +50,8 @@ namespace DaprNetFx
         /// <param name="methodName">The method name to invoke.</param>
         /// <param name="request">The request body.</param>
         /// <returns>A task representing the asynchronous operation with the response.</returns>
-        /// <exception cref="ArgumentNullException">
-        /// Thrown when <paramref name="appId"/> or <paramref name="methodName"/> is null.
+        /// <exception cref="ArgumentException">
+        /// Thrown when <paramref name="appId"/> or <paramref name="methodName"/> is null or whitespace.
         /// </exception>
         /// <exception cref="DaprException">
         /// Thrown when Dapr is unavailable and Required=true (default).
@@ -63,12 +63,12 @@ namespace DaprNetFx
         {
             if (string.IsNullOrWhiteSpace(appId))
             {
-                throw new ArgumentNullException(nameof(appId));
+                throw new ArgumentException("Value cannot be null or whitespace.", nameof(appId));
             }
 
             if (string.IsNullOrWhiteSpace(methodName))
             {
-                throw new ArgumentNullException(nameof(methodName));
+                throw new ArgumentException("Value cannot be null or whitespace.", nameof(methodName));
             }
 
             var path = $"/v1.0/invoke/{appId}/method/{methodName}";
@@ -83,8 +83,8 @@ namespace DaprNetFx
         /// <param name="appId">The target application ID.</param>
         /// <param name="methodName">The method name to invoke.</param>
         /// <returns>A task representing the asynchronous operation with the response.</returns>
-        /// <exception cref="ArgumentNullException">
-        /// Thrown when <paramref name="appId"/> or <paramref name="methodName"/> is null.
+        /// <exception cref="ArgumentException">
+        /// Thrown when <paramref name="appId"/> or <paramref name="methodName"/> is null or whitespace.
         /// </exception>
         /// <exception cref="DaprException">
         /// Thrown when Dapr is unavailable and Required=true (default).
@@ -95,12 +95,12 @@ namespace DaprNetFx
         {
             if (string.IsNullOrWhiteSpace(appId))
             {
-                throw new ArgumentNullException(nameof(appId));
+                throw new ArgumentException("Value cannot be null or whitespace.", nameof(appId));
             }
 
             if (string.IsNullOrWhiteSpace(methodName))
             {
-                throw new ArgumentNullException(nameof(methodName));
+                throw new ArgumentException("Value cannot be null or whitespace.", nameof(methodName));
             }
 
             var path = $"/v1.0/invoke/{appId}/method/{methodName}";
