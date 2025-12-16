@@ -250,6 +250,8 @@ namespace DaprNetFx.Tests
                 exception.ShouldNotBeNull();
                 exception.GetType().ShouldBe(typeof(System.Net.Http.HttpRequestException));
             }
+
+            await Task.CompletedTask;
         }
 
         [Test]

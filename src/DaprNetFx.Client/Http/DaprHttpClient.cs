@@ -3,6 +3,8 @@
 namespace DaprNetFx.Http
 {
     using System;
+    using System.Collections.Generic;
+    using System.Linq;
     using System.Net;
     using System.Net.Http;
     using System.Net.Http.Headers;
@@ -118,12 +120,127 @@ namespace DaprNetFx.Http
         /// <returns>The deserialized response.</returns>
         internal async Task<TResponse> GetJsonAsync<TResponse>(string path)
         {
-            var requestUri = BuildUri(path);
+            return await GetJsonAsync<TResponse>(path, null).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Sends a GET request to the specified path with query parameters.
+        /// </summary>
+        /// <typeparam name="TResponse">The response body type.</typeparam>
+        /// <param name="path">The API path.</param>
+        /// <param name="queryParams">Optional query parameters.</param>
+        /// <returns>The deserialized response.</returns>
+        internal async Task<TResponse> GetJsonAsync<TResponse>(
+            string path,
+            Dictionary<string, string> queryParams)
+        {
+            var requestUri = BuildUri(path, queryParams);
             var request = CreateRequest(HttpMethod.Get, requestUri);
 
             using (var response = await SendRequestAsync(request).ConfigureAwait(false))
             {
                 return await DeserializeResponseAsync<TResponse>(response).ConfigureAwait(false);
+            }
+        }
+
+        /// <summary>
+        /// Sends a POST request with JSON body expecting 204 No Content response.
+        /// </summary>
+        /// <typeparam name="TRequest">The request body type.</typeparam>
+        /// <param name="path">The API path.</param>
+        /// <param name="requestBody">The request body.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        internal async Task PostJsonNoContentAsync<TRequest>(
+            string path,
+            TRequest requestBody)
+        {
+            var requestUri = BuildUri(path);
+            var request = CreateRequest(HttpMethod.Post, requestUri);
+
+            if (requestBody != null)
+            {
+                var json = JsonConvert.SerializeObject(requestBody);
+                request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+            }
+
+            using (var response = await SendRequestAsync(request).ConfigureAwait(false))
+            {
+                // 204 No Content - no response body to deserialize
+            }
+        }
+
+        /// <summary>
+        /// Sends a GET request and extracts ETag from response headers.
+        /// </summary>
+        /// <typeparam name="TResponse">The response body type.</typeparam>
+        /// <param name="path">The API path.</param>
+        /// <param name="queryParams">Optional query parameters.</param>
+        /// <returns>A tuple containing the deserialized response and ETag.</returns>
+        internal async Task<(TResponse Value, string ETag)> GetJsonWithHeadersAsync<TResponse>(
+            string path,
+            Dictionary<string, string> queryParams = null)
+        {
+            var requestUri = BuildUri(path, queryParams);
+            var request = CreateRequest(HttpMethod.Get, requestUri);
+
+            using (var response = await SendRequestAsync(request).ConfigureAwait(false))
+            {
+                var etag = response.Headers.ETag?.Tag;
+                var value = await DeserializeResponseAsync<TResponse>(response).ConfigureAwait(false);
+                return (value, etag);
+            }
+        }
+
+        /// <summary>
+        /// Sends a POST request with JSON body and deserializes array response.
+        /// </summary>
+        /// <typeparam name="TRequest">The request body type.</typeparam>
+        /// <typeparam name="TResponse">The response array element type.</typeparam>
+        /// <param name="path">The API path.</param>
+        /// <param name="requestBody">The request body.</param>
+        /// <returns>The deserialized array response.</returns>
+        internal async Task<TResponse[]> PostJsonArrayAsync<TRequest, TResponse>(
+            string path,
+            TRequest requestBody)
+        {
+            var requestUri = BuildUri(path);
+            var request = CreateRequest(HttpMethod.Post, requestUri);
+
+            if (requestBody != null)
+            {
+                var json = JsonConvert.SerializeObject(requestBody);
+                request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+            }
+
+            using (var response = await SendRequestAsync(request).ConfigureAwait(false))
+            {
+                var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    return new TResponse[0]; // Empty array for empty response
+                }
+
+                return JsonConvert.DeserializeObject<TResponse[]>(json);
+            }
+        }
+
+        /// <summary>
+        /// Sends a DELETE request to the specified path.
+        /// </summary>
+        /// <param name="path">The API path.</param>
+        /// <param name="queryParams">Optional query parameters.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        internal async Task DeleteAsync(
+            string path,
+            Dictionary<string, string> queryParams = null)
+        {
+            var requestUri = BuildUri(path, queryParams);
+            var request = CreateRequest(HttpMethod.Delete, requestUri);
+
+            using (var response = await SendRequestAsync(request).ConfigureAwait(false))
+            {
+                // 204 No Content - no response body
             }
         }
 
@@ -194,10 +311,19 @@ namespace DaprNetFx.Http
             return JsonConvert.DeserializeObject<TResponse>(json);
         }
 
-        private Uri BuildUri(string path)
+        private Uri BuildUri(string path, Dictionary<string, string> queryParams = null)
         {
             var baseUri = _options.HttpEndpoint.TrimEnd('/');
             var fullPath = path.StartsWith("/") ? path : "/" + path;
+
+            if (queryParams != null && queryParams.Count > 0)
+            {
+                var queryString = string.Join(
+                    "&",
+                    queryParams.Select(kvp => $"{Uri.EscapeDataString(kvp.Key)}={Uri.EscapeDataString(kvp.Value)}"));
+                fullPath = $"{fullPath}?{queryString}";
+            }
+
             return new Uri(baseUri + fullPath);
         }
     }
