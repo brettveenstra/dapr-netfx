@@ -50,15 +50,15 @@ namespace DaprNetFx.Tests
         [Test]
         public void Constructor_WithInvalidUri_ShouldThrowArgumentException()
         {
-            // Arrange - URI without scheme (common configuration mistake)
+            // Arrange - Invalid URI format (not even parseable)
             var options = new DaprClientOptions
             {
-                HttpEndpoint = "localhost:3500" // Missing http:// or https://
+                HttpEndpoint = "not a valid uri" // Contains spaces, not parseable
             };
 
             // Act & Assert
             var exception = Should.Throw<ArgumentException>(() => new DaprClient(options));
-            exception.Message.ShouldContain("not a valid absolute URI");
+            exception.Message.ShouldContain("is not a valid absolute URI");
             exception.Message.ShouldContain("http://hostname:port");
         }
 
@@ -75,6 +75,22 @@ namespace DaprNetFx.Tests
             var exception = Should.Throw<ArgumentException>(() => new DaprClient(options));
             exception.Message.ShouldContain("must use http:// or https:// scheme");
             exception.Message.ShouldContain("ftp");
+        }
+
+        [Test]
+        public void Constructor_WithMissingScheme_ShouldThrowArgumentException()
+        {
+            // Arrange - Common mistake: missing http:// prefix
+            // Note: "localhost:3500" is parsed as scheme="localhost", path="3500"
+            var options = new DaprClientOptions
+            {
+                HttpEndpoint = "localhost:3500" // Missing http:// or https://
+            };
+
+            // Act & Assert
+            var exception = Should.Throw<ArgumentException>(() => new DaprClient(options));
+            exception.Message.ShouldContain("must use http:// or https:// scheme");
+            exception.Message.ShouldContain("localhost"); // Shows the parsed "scheme"
         }
 
         [Test]
@@ -214,14 +230,14 @@ namespace DaprNetFx.Tests
         }
 
         [Test]
-        public void InvokeMethodAsync_WhenDaprUnavailableAndRequiredFalse_ShouldThrowHttpRequestException()
+        public async Task InvokeMethodAsync_WhenDaprUnavailableAndRequiredFalse_ShouldThrowHttpRequestException()
         {
             // Arrange - create client pointing to non-existent Dapr with Required=false
             var optionalOptions = new DaprClientOptions
             {
                 HttpEndpoint = "http://localhost:9998",
                 Required = false, // Key: Exception should NOT be wrapped in DaprException
-                HttpTimeout = TimeSpan.FromSeconds(1)
+                HttpTimeout = TimeSpan.FromSeconds(5) // Longer timeout ensures connection failure before timeout
             };
 
             using (var optionalClient = new DaprClient(optionalOptions))
