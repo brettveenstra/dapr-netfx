@@ -48,6 +48,36 @@ namespace DaprNetFx.Tests
         }
 
         [Test]
+        public void Constructor_WithInvalidUri_ShouldThrowArgumentException()
+        {
+            // Arrange - URI without scheme (common configuration mistake)
+            var options = new DaprClientOptions
+            {
+                HttpEndpoint = "localhost:3500" // Missing http:// or https://
+            };
+
+            // Act & Assert
+            var exception = Should.Throw<ArgumentException>(() => new DaprClient(options));
+            exception.Message.ShouldContain("not a valid absolute URI");
+            exception.Message.ShouldContain("http://hostname:port");
+        }
+
+        [Test]
+        public void Constructor_WithInvalidScheme_ShouldThrowArgumentException()
+        {
+            // Arrange - URI with unsupported scheme
+            var options = new DaprClientOptions
+            {
+                HttpEndpoint = "ftp://localhost:3500" // FTP not supported
+            };
+
+            // Act & Assert
+            var exception = Should.Throw<ArgumentException>(() => new DaprClient(options));
+            exception.Message.ShouldContain("must use http:// or https:// scheme");
+            exception.Message.ShouldContain("ftp");
+        }
+
+        [Test]
         public async Task InvokeMethodAsync_WithRequestAndResponse_ShouldCallDaprApi()
         {
             // Arrange

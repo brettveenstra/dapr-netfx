@@ -44,10 +44,28 @@ namespace DaprNetFx.Http
         {
             _options = options ?? throw new ArgumentNullException(nameof(options));
 
+            // Validate HTTP endpoint format at construction time for fail-fast behavior
+            // Better to get clear error on startup than cryptic exception on first API call
+            if (!Uri.TryCreate(_options.HttpEndpoint, UriKind.Absolute, out var endpointUri))
+            {
+                throw new ArgumentException(
+                    $"HttpEndpoint '{_options.HttpEndpoint}' is not a valid absolute URI. " +
+                    $"Expected format: http://hostname:port or https://hostname:port",
+                    nameof(options));
+            }
+
+            if (endpointUri.Scheme != Uri.UriSchemeHttp && endpointUri.Scheme != Uri.UriSchemeHttps)
+            {
+                throw new ArgumentException(
+                    $"HttpEndpoint '{_options.HttpEndpoint}' must use http:// or https:// scheme. " +
+                    $"Found scheme: {endpointUri.Scheme}",
+                    nameof(options));
+            }
+
             // Configure ServicePoint for the Dapr endpoint to enable connection recycling
             // Defense-in-depth: Even if DNS returns same IP, recycling connections helps
             // recover from transient network issues (Azure load balancer failures, etc.)
-            var servicePoint = ServicePointManager.FindServicePoint(new Uri(_options.HttpEndpoint));
+            var servicePoint = ServicePointManager.FindServicePoint(endpointUri);
             servicePoint.ConnectionLeaseTimeout = 120000; // 2 minutes
             servicePoint.ConnectionLimit = 50; // Max concurrent connections to this endpoint
 
