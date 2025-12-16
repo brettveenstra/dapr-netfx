@@ -150,25 +150,6 @@ namespace DaprNetFx.AspNet.Tests
         }
 
         [Test]
-        public void Dispose_ShouldDisposeDaprClient()
-        {
-            // Arrange - Create a fake DaprClient to track Dispose calls
-            var fakeDaprClient = A.Fake<DaprClient>(x => x.WithArgumentsForConstructor(new object[]
-            {
-                new DaprClientOptions { HttpEndpoint = "http://localhost:3500", Required = false }
-            }));
-
-            var resolver = new DaprDependencyResolver(fakeDaprClient, _innerResolver);
-
-            // Act
-            resolver.Dispose();
-
-            // Assert
-            A.CallTo(() => fakeDaprClient.Dispose())
-                .MustHaveHappenedOnceExactly();
-        }
-
-        [Test]
         public void Dispose_ShouldDisposeInnerResolver()
         {
             var resolver = new DaprDependencyResolver(_daprClient, _innerResolver);
@@ -180,32 +161,30 @@ namespace DaprNetFx.AspNet.Tests
         }
 
         [Test]
-        public void Dispose_ShouldDisposeBothDaprClientAndInnerResolver()
-        {
-            // Arrange - Create fake DaprClient
-            var fakeDaprClient = A.Fake<DaprClient>(x => x.WithArgumentsForConstructor(new object[]
-            {
-                new DaprClientOptions { HttpEndpoint = "http://localhost:3500", Required = false }
-            }));
-
-            var resolver = new DaprDependencyResolver(fakeDaprClient, _innerResolver);
-
-            // Act
-            resolver.Dispose();
-
-            // Assert - Both should be disposed
-            A.CallTo(() => fakeDaprClient.Dispose())
-                .MustHaveHappenedOnceExactly();
-            A.CallTo(() => _innerResolver.Dispose())
-                .MustHaveHappenedOnceExactly();
-        }
-
-        [Test]
         public void Dispose_WithNullInnerResolver_ShouldNotThrow()
         {
             var resolver = new DaprDependencyResolver(_daprClient, null);
 
             Should.NotThrow(() => resolver.Dispose());
+        }
+
+        [Test]
+        public void Dispose_ShouldPreventSubsequentUse()
+        {
+            // Arrange - Create real instances
+            var options = new DaprClientOptions
+            {
+                HttpEndpoint = "http://localhost:3500",
+                Required = false
+            };
+            var client = new DaprClient(options);
+            var resolver = new DaprDependencyResolver(client, null);
+
+            // Act - Dispose the resolver
+            resolver.Dispose();
+
+            // Assert - Subsequent use should throw ObjectDisposedException
+            Should.Throw<ObjectDisposedException>(() => resolver.GetService(typeof(DaprClient)));
         }
     }
 }

@@ -14,6 +14,7 @@ namespace DaprNetFx.AspNet
     {
         private readonly DaprClient _daprClient;
         private readonly IDependencyResolver _innerResolver;
+        private bool _disposed;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DaprDependencyResolver"/> class.
@@ -29,6 +30,11 @@ namespace DaprNetFx.AspNet
         /// <inheritdoc/>
         public object GetService(Type serviceType)
         {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(DaprDependencyResolver));
+            }
+
             if (serviceType == typeof(DaprClient))
             {
                 return _daprClient;
@@ -40,6 +46,11 @@ namespace DaprNetFx.AspNet
         /// <inheritdoc/>
         public IEnumerable<object> GetServices(Type serviceType)
         {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(DaprDependencyResolver));
+            }
+
             if (serviceType == typeof(DaprClient))
             {
                 return new[] { _daprClient };
@@ -52,6 +63,11 @@ namespace DaprNetFx.AspNet
         /// <inheritdoc/>
         public IDependencyScope BeginScope()
         {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(DaprDependencyResolver));
+            }
+
             var innerScope = _innerResolver?.BeginScope();
             return new DaprDependencyScope(_daprClient, innerScope);
         }
@@ -59,8 +75,12 @@ namespace DaprNetFx.AspNet
         /// <inheritdoc/>
         public void Dispose()
         {
-            _daprClient?.Dispose();
-            _innerResolver?.Dispose();
+            if (!_disposed)
+            {
+                _daprClient?.Dispose();
+                _innerResolver?.Dispose();
+                _disposed = true;
+            }
         }
     }
 }
