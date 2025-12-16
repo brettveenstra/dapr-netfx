@@ -25,14 +25,15 @@ DaprNetFx enables .NET Framework 4.x applications to leverage [Dapr](https://dap
 
 ## Status
 
-🚧 **POC Phase** - POC1 Complete, POC2 Callbacks Complete
+🚧 **POC Phase** - POC1 Complete, POC2 State Management Complete
 
 ### POC Roadmap
 
 - **POC1** ✅ (Complete): Core client, service invocation (outbound), ASP.NET WebAPI DI integration, sample application
 - **POC2** 🔄 (In Progress):
   - ✅ Service callbacks (inbound) - Dapr → App invocation complete
-  - ⏳ State Management, Pub/Sub, NuGet packaging, Autofac integration
+  - ✅ State Management API - Save/Get/Delete, Bulk, Transactions complete
+  - ⏳ Pub/Sub, NuGet packaging, Autofac integration
 - **POC3** (Planned): Production readiness, OWIN support, performance optimization, real Dapr integration tests
 
 ## Prerequisites
@@ -153,6 +154,75 @@ public class OrdersController : DaprApiController
 // dapr invoke --app-id order-service --method ProcessOrder --verb POST --data '{"id":123}'
 ```
 
+**State Management API**
+
+```csharp
+using DaprNetFx;
+
+using (var client = new DaprClient())
+{
+    // Save state
+    var order = new Order { OrderId = "order-001", Status = "pending", Total = 99.99m };
+    await client.SaveStateAsync("statestore", order.OrderId, order);
+
+    // Get state
+    var retrieved = await client.GetStateAsync<Order>("statestore", order.OrderId);
+
+    // Delete state
+    await client.DeleteStateAsync("statestore", order.OrderId);
+}
+```
+
+**State Management - Advanced Features**
+
+```csharp
+// Strong consistency
+var inventory = await client.GetStateAsync<Inventory>(
+    "statestore",
+    "product-001",
+    ConsistencyMode.Strong
+);
+
+// ETag concurrency control (optimistic locking)
+var options = new StateOptions
+{
+    Concurrency = ConcurrencyMode.FirstWrite,
+    ETag = "version-1",
+    TtlInSeconds = 3600  // Auto-expire after 1 hour
+};
+await client.SaveStateAsync("statestore", "session-001", sessionData, options);
+
+// Bulk operations
+var items = new[]
+{
+    new StateItem<Inventory> { Key = "product-101", Value = inventory1 },
+    new StateItem<Inventory> { Key = "product-102", Value = inventory2 }
+};
+await client.SaveBulkStateAsync("statestore", items);
+
+var keys = new[] { "product-101", "product-102" };
+var results = await client.GetBulkStateAsync<Inventory>("statestore", keys, parallelism: 5);
+await client.DeleteBulkStateAsync("statestore", keys);
+
+// State transactions (atomic multi-operation)
+var operations = new[]
+{
+    new StateTransactionRequest
+    {
+        OperationType = StateOperationType.Upsert,
+        Key = "account-001",
+        Value = new Account { Balance = 800.00m }
+    },
+    new StateTransactionRequest
+    {
+        OperationType = StateOperationType.Upsert,
+        Key = "account-002",
+        Value = new Account { Balance = 700.00m }
+    }
+};
+await client.ExecuteStateTransactionAsync("statestore", operations);
+```
+
 ## Building from Source
 
 ### Clone and Build
@@ -175,6 +245,163 @@ dotnet test
 - StyleCop analyzers enabled
 - XML documentation required for public APIs
 - .editorconfig rules enforced
+
+## Developer Setup (Local Development)
+
+### Prerequisites for SDK Development
+
+1. **.NET Framework 4.8 SDK**
+   - Download: https://dotnet.microsoft.com/download/dotnet-framework/net48
+   - Verify: `dotnet --version` (shows .NET SDK version)
+
+2. **Visual Studio 2019/2022** (recommended) or **Rider**
+   - Required for .NET Framework 4.8 development
+   - Ensure ".NET Framework 4.8 targeting pack" is installed
+
+3. **Windows OS**
+   - .NET Framework 4.8 is Windows-only
+   - WSL2 can be used for building, but tests require Windows
+
+### Setting Up Dapr for Local Development
+
+The SDK's **unit tests use WireMock** (no Dapr required), but **sample applications require real Dapr**.
+
+#### 1. Install Dapr CLI
+
+**Windows (PowerShell)**:
+```powershell
+powershell -Command "iwr -useb https://raw.githubusercontent.com/dapr/cli/master/install/install.ps1 | iex"
+```
+
+**Verify Installation**:
+```bash
+dapr --version
+# Expected: CLI version: 1.14.x, Runtime version: n/a (not initialized yet)
+```
+
+#### 2. Initialize Dapr
+
+```bash
+dapr init
+```
+
+This installs and starts:
+- **Dapr runtime** (placed in `~/.dapr/bin/`)
+- **Redis** (Docker container for state management and pub/sub)
+- **Zipkin** (Docker container for distributed tracing)
+
+**Verify Components Running**:
+```bash
+docker ps
+# Should show: dapr_redis, dapr_zipkin, dapr_placement
+```
+
+**Verify Dapr Components**:
+```bash
+dapr components list
+# Expected output:
+#   NAME       TYPE             VERSION  SCOPES
+#   pubsub     pubsub.redis     v1
+#   statestore state.redis      v1
+```
+
+#### 3. Verify Redis (State Store)
+
+```bash
+# Connect to Redis
+docker exec -it dapr_redis redis-cli
+
+# Test Redis
+127.0.0.1:6379> ping
+PONG
+
+# Exit Redis
+127.0.0.1:6379> exit
+```
+
+### Running Sample Applications
+
+**ServiceInvocationSample** (POC1):
+```bash
+# Terminal 1: Start Dapr sidecar
+dapr run --app-id sampleapp --dapr-http-port 3500
+
+# Terminal 2: Run sample
+cd samples/ServiceInvocationSample
+dotnet run
+```
+
+**StateManagementSample** (POC2):
+```bash
+# Terminal 1: Start Dapr sidecar
+dapr run --app-id stateapp --dapr-http-port 3500
+
+# Terminal 2: Run sample
+cd samples/StateManagementSample
+dotnet run
+```
+
+### Troubleshooting Local Development
+
+**Issue**: `dapr: command not found`
+
+**Solution**: Add Dapr to PATH
+```bash
+# Windows PowerShell
+$env:Path += ";$env:USERPROFILE\.dapr\bin"
+
+# Linux/macOS
+export PATH=$PATH:$HOME/.dapr/bin
+```
+
+**Issue**: `Cannot connect to Docker daemon`
+
+**Solution**: Start Docker Desktop (required for `dapr init`)
+
+**Issue**: Redis port 6379 already in use
+
+**Solution**: Stop conflicting Redis instance or change Dapr's Redis port
+```bash
+# Uninitialize Dapr
+dapr uninstall
+
+# Reinitialize with custom Redis port
+dapr init --redis-port 6380
+```
+
+**Issue**: Tests failing in WSL2
+
+**Solution**: .NET Framework 4.8 tests must run on Windows
+```bash
+# Build in WSL2 is OK
+dotnet build
+
+# Tests require Windows (run in PowerShell or Visual Studio)
+# WSL2: dotnet test will fail (mono compatibility issues)
+```
+
+### Development Workflow
+
+1. **Make Changes**: Edit SDK source code
+2. **Build**: `dotnet build` (verify 0 errors, 0 warnings)
+3. **Run Tests**: `dotnet test` (all tests must pass)
+4. **Test Samples**: Run sample apps against real Dapr
+5. **Commit**: Follow conventional commits (feat:, fix:, docs:, etc.)
+
+### Code Quality Checks
+
+Before committing:
+```bash
+# Build with no warnings
+dotnet build --no-incremental
+
+# Run all tests
+dotnet test --no-build
+
+# Verify StyleCop compliance (warnings as errors enforced)
+# XML documentation on all public APIs
+# .editorconfig rules followed
+```
 
 ## Package Architecture
 
@@ -218,23 +445,39 @@ dotnet test
 DaprNetFx/
 ├── src/
 │   ├── DaprNetFx.Client/              # Core SDK (zero DI deps) ✅
+│   │   ├── Service Invocation API     # InvokeMethodAsync<TRequest, TResponse>
+│   │   ├── State Management API       # SaveStateAsync, GetStateAsync, DeleteStateAsync
+│   │   ├── Bulk State Operations      # SaveBulkStateAsync, GetBulkStateAsync, DeleteBulkStateAsync
+│   │   └── State Transactions         # ExecuteStateTransactionAsync (atomic multi-op)
 │   ├── DaprNetFx.AspNet/              # ASP.NET WebAPI DI integration ✅
-│   ├── DaprNetFx.Autofac/             # Autofac integration (POC2)
-│   ├── DaprNetFx.AspNet.Callbacks/    # Inbound service invocation (POC2)
-│   └── DaprNetFx.AspNet.SelfHost/     # OWIN self-host adapter (POC3)
+│   │   ├── Dependency Injection       # config.UseDapr()
+│   │   ├── Outbound Calls             # DaprApiController with Dapr property
+│   │   └── Inbound Callbacks          # CallbackContext, [DaprCallback] attribute
+│   ├── DaprNetFx.Autofac/             # Autofac integration (POC2 - planned)
+│   └── DaprNetFx.AspNet.SelfHost/     # OWIN self-host adapter (POC3 - planned)
 ├── test/
 │   ├── DaprNetFx.Client.Tests/        # Client unit tests (WireMock) ✅
+│   │   ├── Service Invocation Tests   # 21 tests - all HTTP methods, error handling
+│   │   └── State Management Tests     # 50 tests - CRUD, bulk, transactions, validation
 │   ├── DaprNetFx.AspNet.Tests/        # AspNet unit tests (FakeItEasy) ✅
-│   └── DaprNetFx.IntegrationTests/    # Real Dapr integration tests (POC3)
+│   │   ├── DI Integration Tests       # 11 tests - resolver, scope, disposal
+│   │   └── Callback Tests             # 25 tests - context, headers, routing
+│   └── DaprNetFx.IntegrationTests/    # Real Dapr integration tests (POC3 - planned)
 ├── samples/
-│   ├── ServiceInvocationSample/       # Console app sample ✅
-│   ├── StateManagementSample/         # POC2 sample
-│   └── PubSubSample/                  # POC2 sample
+│   ├── ServiceInvocationSample/       # Console app - service invocation patterns ✅
+│   ├── StateManagementSample/         # Console app - state CRUD, bulk, transactions ✅
+│   └── PubSubSample/                  # POC2 sample (planned)
 └── docs/
-    └── ARCHITECTURE.md                # Architecture documentation
+    └── ARCHITECTURE.md                # Deployment patterns, Azure hosting options
 ```
 
-**POC1 Status**: ✅ marks completed components (57 tests total: 21 client + 36 AspNet)
+**Current Status**:
+- ✅ **107 tests passing** (71 client + 36 AspNet)
+- ✅ **2 complete sample applications** with comprehensive READMEs
+- ✅ **Service Invocation** - Outbound calls + Inbound callbacks
+- ✅ **State Management** - Full API including bulk operations and transactions
+- ⏳ **Pub/Sub** - Planned for POC2
+- ⏳ **NuGet Packaging** - Planned for POC2
 
 ## Deployment Patterns
 
@@ -300,4 +543,4 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-**Status**: 🚧 POC1 in progress - Not ready for production use
+**Status**: 🚧 POC2 in progress - State Management complete (107 tests passing) - Not ready for production use
