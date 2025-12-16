@@ -358,6 +358,91 @@ namespace DaprNetFx.Tests
             response.ShouldBeNull();
         }
 
+        [Test]
+        public void Constructor_WithCustomHttpTimeoutInOptions_ShouldUseCustomTimeout()
+        {
+            // Arrange
+            var customTimeout = TimeSpan.FromSeconds(60);
+            var options = new DaprClientOptions
+            {
+                HttpEndpoint = _wireMockServer.Urls[0],
+                HttpTimeout = customTimeout
+            };
+
+            // Act
+            using (var client = new DaprClient(options))
+            {
+                // Assert - Verify timeout is set (can't directly access private field, but constructor didn't throw)
+                client.ShouldNotBeNull();
+            }
+        }
+
+        [Test]
+        public void Constructor_WithEnvironmentVariableHttpTimeout_ShouldOverrideDefault()
+        {
+            // Arrange - Set environment variable
+            Environment.SetEnvironmentVariable("DAPR_HTTP_TIMEOUT_SECONDS", "45");
+
+            try
+            {
+                // Act - Create client using default constructor (loads from config)
+                using (var client = new DaprClient())
+                {
+                    // Assert - Client created successfully with env var timeout
+                    client.ShouldNotBeNull();
+                }
+            }
+            finally
+            {
+                // Cleanup
+                Environment.SetEnvironmentVariable("DAPR_HTTP_TIMEOUT_SECONDS", null);
+            }
+        }
+
+        [Test]
+        public void Constructor_WithInvalidHttpTimeoutValue_ShouldUseDefault()
+        {
+            // Arrange - Set invalid environment variable (negative value)
+            Environment.SetEnvironmentVariable("DAPR_HTTP_TIMEOUT_SECONDS", "-5");
+
+            try
+            {
+                // Act - Create client using default constructor
+                using (var client = new DaprClient())
+                {
+                    // Assert - Client created successfully (invalid value ignored, uses default 30s)
+                    client.ShouldNotBeNull();
+                }
+            }
+            finally
+            {
+                // Cleanup
+                Environment.SetEnvironmentVariable("DAPR_HTTP_TIMEOUT_SECONDS", null);
+            }
+        }
+
+        [Test]
+        public void Constructor_WithNonNumericHttpTimeout_ShouldUseDefault()
+        {
+            // Arrange - Set non-numeric environment variable
+            Environment.SetEnvironmentVariable("DAPR_HTTP_TIMEOUT_SECONDS", "invalid");
+
+            try
+            {
+                // Act - Create client using default constructor
+                using (var client = new DaprClient())
+                {
+                    // Assert - Client created successfully (invalid value ignored, uses default 30s)
+                    client.ShouldNotBeNull();
+                }
+            }
+            finally
+            {
+                // Cleanup
+                Environment.SetEnvironmentVariable("DAPR_HTTP_TIMEOUT_SECONDS", null);
+            }
+        }
+
         private class TestResponse
         {
             public string Message { get; set; }

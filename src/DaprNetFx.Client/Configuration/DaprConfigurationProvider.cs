@@ -13,10 +13,12 @@ namespace DaprNetFx.Configuration
         private const string HttpEndpointKey = "Dapr:HttpEndpoint";
         private const string ApiTokenKey = "Dapr:ApiToken";
         private const string RequiredKey = "Dapr:Required";
+        private const string HttpTimeoutSecondsKey = "Dapr:HttpTimeoutSeconds";
 
         private const string HttpEndpointEnvVar = "DAPR_HTTP_ENDPOINT";
         private const string ApiTokenEnvVar = "DAPR_API_TOKEN";
         private const string RequiredEnvVar = "DAPR_REQUIRED";
+        private const string HttpTimeoutSecondsEnvVar = "DAPR_HTTP_TIMEOUT_SECONDS";
 
         /// <summary>
         /// Loads Dapr client options from configuration sources.
@@ -50,6 +52,19 @@ namespace DaprNetFx.Configuration
             if (bool.TryParse(requiredValue, out var required))
             {
                 options.Required = required;
+            }
+
+            // HttpTimeout: Environment variable > AppSettings > 30 seconds (default)
+            var timeoutValue = GetConfigValue(
+                HttpTimeoutSecondsEnvVar,
+                HttpTimeoutSecondsKey,
+                defaultValue: null);
+
+            if (!string.IsNullOrWhiteSpace(timeoutValue) &&
+                int.TryParse(timeoutValue, out var timeoutSeconds) &&
+                timeoutSeconds > 0)
+            {
+                options.HttpTimeout = TimeSpan.FromSeconds(timeoutSeconds);
             }
 
             return options;

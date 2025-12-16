@@ -18,7 +18,7 @@ namespace DaprNetFx.Tests
             var options = new DaprClientOptions();
 
             options.HttpEndpoint.ShouldBe("http://localhost:3500");
-            options.HttpTimeout.ShouldBe(TimeSpan.FromSeconds(30));
+            options.HttpTimeout.ShouldBe(TimeSpan.FromSeconds(5));
             options.Required.ShouldBeTrue();
             options.ApiToken.ShouldBeNull();
         }

@@ -10,7 +10,7 @@ namespace DaprNetFx
     public class DaprClientOptions
     {
         private const string DefaultHttpEndpoint = "http://localhost:3500";
-        private const int DefaultHttpTimeoutSeconds = 30;
+        private const int DefaultHttpTimeoutSeconds = 5;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DaprClientOptions"/> class with default values.
@@ -46,7 +46,10 @@ namespace DaprNetFx
         /// <summary>
         /// Gets or sets the HTTP request timeout.
         /// </summary>
-        /// <value>The timeout duration. Defaults to 30 seconds.</value>
+        /// <value>
+        /// The timeout duration. Defaults to 5 seconds (optimized for sidecar pattern with ~2ms latency).
+        /// Override to 10-30 seconds for remote Dapr deployments via app.config or environment variable.
+        /// </value>
         public TimeSpan HttpTimeout { get; set; }
     }
 }
