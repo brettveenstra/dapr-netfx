@@ -59,6 +59,7 @@ namespace DaprNetFx.AspNet
         /// <inheritdoc/>
         public void Dispose()
         {
+            _daprClient?.Dispose();
             _innerResolver?.Dispose();
         }
     }

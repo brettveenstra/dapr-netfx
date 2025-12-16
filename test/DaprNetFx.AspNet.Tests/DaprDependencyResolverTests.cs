@@ -150,12 +150,52 @@ namespace DaprNetFx.AspNet.Tests
         }
 
         [Test]
+        public void Dispose_ShouldDisposeDaprClient()
+        {
+            // Arrange - Create a fake DaprClient to track Dispose calls
+            var fakeDaprClient = A.Fake<DaprClient>(x => x.WithArgumentsForConstructor(new object[]
+            {
+                new DaprClientOptions { HttpEndpoint = "http://localhost:3500", Required = false }
+            }));
+
+            var resolver = new DaprDependencyResolver(fakeDaprClient, _innerResolver);
+
+            // Act
+            resolver.Dispose();
+
+            // Assert
+            A.CallTo(() => fakeDaprClient.Dispose())
+                .MustHaveHappenedOnceExactly();
+        }
+
+        [Test]
         public void Dispose_ShouldDisposeInnerResolver()
         {
             var resolver = new DaprDependencyResolver(_daprClient, _innerResolver);
 
             resolver.Dispose();
 
+            A.CallTo(() => _innerResolver.Dispose())
+                .MustHaveHappenedOnceExactly();
+        }
+
+        [Test]
+        public void Dispose_ShouldDisposeBothDaprClientAndInnerResolver()
+        {
+            // Arrange - Create fake DaprClient
+            var fakeDaprClient = A.Fake<DaprClient>(x => x.WithArgumentsForConstructor(new object[]
+            {
+                new DaprClientOptions { HttpEndpoint = "http://localhost:3500", Required = false }
+            }));
+
+            var resolver = new DaprDependencyResolver(fakeDaprClient, _innerResolver);
+
+            // Act
+            resolver.Dispose();
+
+            // Assert - Both should be disposed
+            A.CallTo(() => fakeDaprClient.Dispose())
+                .MustHaveHappenedOnceExactly();
             A.CallTo(() => _innerResolver.Dispose())
                 .MustHaveHappenedOnceExactly();
         }
